@@ -925,9 +925,10 @@ describe('Auction', async function () {
 			const left = Order(buyer, Asset(ETH, "0x", bidAmount1), ZERO_ADDRESS, Asset(ERC721, enc(erc721V1.address, erc721TokenId1), 1), 1, 0, 0, NFT_TRANSFER_FROM_CONTRACT, "0x");
 			const right = Order(seller, Asset(ERC721, enc(erc721V1.address, erc721TokenId1), 1), ZERO_ADDRESS, Asset(ETH, "0x", bidAmount1), 1, 0, 0, NFT_TRANSFER_FROM_CONTRACT, "0x");
 
+			let anotherSigner = await testing.connect(wallet3);
 
 			await expectRevert(
-				testing.endAuctionDoTransfer(left, right, auctionId),
+				anotherSigner.endAuctionDoTransfer(left, right, auctionId, {from: accounts3}),
 				"Auction can only be claimed by the address who won it"
 			);
 
