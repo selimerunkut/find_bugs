@@ -7,9 +7,15 @@ const accounts = generatedWallets(provider);
 
 
 async function main() {
-
+  
   //const ExchangeV2 = await ethers.getContractFactory('contracts/ExchangeV2.sol_flat.sol:ExchangeV2');
-  const ExchangeV2 = await ethers.getContractFactory('ExchangeV2');
+  const LibExchangeAuctionFactory = await ethers.getContractFactory("LibExchangeAuction");
+  const libExchangeAuction = await LibExchangeAuctionFactory.deploy();
+  const ExchangeV2 = await ethers.getContractFactory("ExchangeV2", {
+    libraries: {
+      LibExchangeAuction: libExchangeAuction.address
+    }
+  });
   const TransferProxy = await ethers.getContractFactory('TransferProxy');
   const ERC20TransferProxy = await ethers.getContractFactory('ERC20TransferProxy');
 
@@ -30,7 +36,7 @@ async function main() {
   const instance = await upgrades.deployProxy(
     ExchangeV2,
     [transferProxy, erc20TransferProxy, 100, exchangeFeeWallet, adminRecoveryAddress],
-    { initializer: '__ExchangeV2_init' }
+    { initializer: '__ExchangeV2_init', unsafeAllowLinkedLibraries: true }
   );
   //add ExchangeV2 address to the the allowed operators of transferProxy & erc20TransferProxy
   transferProxyDeployed.addOperator(instance.address)
@@ -41,6 +47,7 @@ async function main() {
   console.log('erc20TransferProxy: ', erc20TransferProxy)
   console.log('exchangeFeeWallet: ', exchangeFeeWallet)
   console.log('adminRecoveryAddress: ', adminRecoveryAddress)
+  console.log('libExchangeAuction deployed: ', libExchangeAuction.address);
   console.log('fee: ', 100)
 }
 
