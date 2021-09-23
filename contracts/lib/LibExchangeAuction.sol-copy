@@ -1,0 +1,226 @@
+/// SPDX-License-Identifier: GPL-3.0-or-later
+
+pragma solidity ^0.8.4;
+
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
+import "./LibTransfer.sol";
+
+library LibExchangeAuction {
+    using SafeMathUpgradeable for uint256;
+    using LibTransfer for address;
+
+    enum AuctionTypes {
+        Other,
+        Classic,
+        Reserve,
+        Dutch
+    }
+
+    struct Auction {
+        uint256[] amDuFiReToStaStpEnExEr;
+        /// amDuFiReToStaStpEnExEr[0] = amount (initial value 0)
+        /// amDuFiReToStaStpEnExEr[1] = duration
+        /// amDuFiReToStaStpEnExEr[2] = firstBidTime (initial value 0)
+        /// amDuFiReToStaStpEnExEr[3] = reservePrice
+        /// amDuFiReToStaStpEnExEr[4] = tokenId
+        /// amDuFiReToStaStpEnExEr[5] = startingAt
+        /// amDuFiReToStaStpEnExEr[6] = startingPrice
+        /// amDuFiReToStaStpEnExEr[7] = endingPrice
+        /// amDuFiReToStaStpEnExEr[8] = extensionPeriod
+        /// amDuFiReToStaStpEnExEr[9] = erc1155Amount
+        /// The value of the current highest bid.
+        //uint256 amount;
+        /// The amount of time that the auction should run for,
+        /// after the first bid was made.
+        //uint256 duration;
+        /// The time of the first bid.
+        //uint256 firstBidTime;
+        /// The minimum price of the first bid.
+        //uint256 reservePrice;
+        /// The address of the current highest bid.
+        address payable bidder;
+        /// The address that created the auction.
+        address creator;
+        /// Address of the NFT contract
+        address nftContract;
+        /// TokenId of the NFT contract
+        //uint256 tokenId;
+        /// Type of the auction
+        AuctionTypes auctionType;
+        /// starting block.timestamp of the auction
+        //uint256 startingAt;
+        /// starting price of the auction
+        //uint256 startingPrice;
+        /// ending price of the auction
+        //uint256 endingPrice;
+        /// extension period of the auction
+        //uint256 extensionPeriod;
+        /// payment currency as erc20 contract address
+        address currency;
+        /// token amount for erc1155
+        //uint256 erc1155Amount;
+    }
+
+    struct Auctions {
+        mapping(uint256 => Auction) auctions;
+    }
+
+    function handleClassicReserveAution(
+        uint256 auctionId,
+        uint256 amount,
+        bool useToken,
+        uint8 minBidIncrementPercentAuction,
+        IERC20Upgradeable token,
+        Auctions storage auctionsStruct
+    ) internal {
+        if (
+            auctionsStruct.auctions[auctionId].auctionType ==
+            AuctionTypes.Reserve ||
+            auctionsStruct.auctions[auctionId].auctionType ==
+            AuctionTypes.Classic
+        ) {
+            /// Check if the current bid amount is 0.
+            if (
+                auctionsStruct.auctions[auctionId].amDuFiReToStaStpEnExEr[0] ==
+                0
+            ) {
+                /// If so, it is the first bid.
+                auctionsStruct.auctions[auctionId].amDuFiReToStaStpEnExEr[
+                        2
+                    ] = block.timestamp;
+                /// for reserve auction
+                if (
+                    auctionsStruct.auctions[auctionId].auctionType ==
+                    AuctionTypes.Reserve
+                ) {
+                    /// We only need to check if the bid matches reserve bid for the first bid,
+                    /// since future checks will need to be higher than any previous bid.
+                    require(
+                        amount >=
+                            auctionsStruct
+                                .auctions[auctionId]
+                                .amDuFiReToStaStpEnExEr[3],
+                        "MBRPOM"
+                    );
+                }
+            } else {
+                /// Check that the new bid is sufficiently higher than the previous bid, by
+                /// the percentage defined as minBidIncrementPercentAuction.
+                require(
+                    amount >=
+                        auctionsStruct
+                            .auctions[auctionId]
+                            .amDuFiReToStaStpEnExEr[0]
+                            .add(
+                                /// Add minBidIncrementPercentAuction of the current bid to the current bid.
+                                auctionsStruct
+                                    .auctions[auctionId]
+                                    .amDuFiReToStaStpEnExEr[0]
+                                    .mul(minBidIncrementPercentAuction)
+                                    .div(100)
+                            ),
+                    "NMB"
+                );
+
+                /// Refund the previous bidder.
+                if (useToken) {
+                    token.transfer(
+                        address(auctionsStruct.auctions[auctionId].bidder),
+                        auctionsStruct
+                            .auctions[auctionId]
+                            .amDuFiReToStaStpEnExEr[0]
+                    );
+                } else {
+                    address(auctionsStruct.auctions[auctionId].bidder)
+                        .transferEth(
+                            auctionsStruct
+                                .auctions[auctionId]
+                                .amDuFiReToStaStpEnExEr[0]
+                        );
+                }
+            }
+        }
+    }
+
+    function handleCreateBidPreConditions(
+        uint256 auctionId,
+        uint256 amount,
+        Auctions storage auctionsStruct
+    ) internal view {
+        /// Auction is not expired if there's never been a bid, or if the
+        /// current time is less than the time at which the auction ends.
+        require(
+            auctionsStruct.auctions[auctionId].amDuFiReToStaStpEnExEr[2] == 0 ||
+                block.timestamp <
+                auctionsStruct
+                    .auctions[auctionId]
+                    .amDuFiReToStaStpEnExEr[2]
+                    .add(
+                        auctionsStruct
+                            .auctions[auctionId]
+                            .amDuFiReToStaStpEnExEr[1]
+                    ),
+            "AE"
+        );
+        require(
+            auctionsStruct.auctions[auctionId].amDuFiReToStaStpEnExEr[5] <=
+                block.timestamp,
+            "ANS"
+        );
+        require(amount > 0, "AMGT0");
+    }
+
+    function handleDutch(
+        uint256 auctionId,
+        uint256 amount,
+        Auctions storage auctionsStruct
+    ) internal {
+        /// only one bid allowed
+        require(
+            auctionsStruct.auctions[auctionId].amDuFiReToStaStpEnExEr[2] == 0,
+            "DACOHOB"
+        );
+        uint256 price = getCurrentPrice(auctionsStruct.auctions[auctionId]);
+        require(amount >= price, "MSGVGEP");
+        auctionsStruct.auctions[auctionId].amDuFiReToStaStpEnExEr[7] = price;
+        auctionsStruct.auctions[auctionId].amDuFiReToStaStpEnExEr[2] = block
+            .timestamp;
+    }
+
+    /**
+     * @dev calculate the current price for the dutch auction
+     *
+     * timeSinceStart = block.timestamp - auction.startingAt
+     * priceDiff = auction.startingPrice - auction.endingPrice
+     * currentPrice = auction.startingPrice - (timeSinceStart * (priceDiff / auction.duration))
+     */
+    function getCurrentPrice(Auction memory auction)
+        public
+        view
+        returns (uint256)
+    {
+        require(auction.amDuFiReToStaStpEnExEr[5] > 0);
+
+        uint256 secondsPassed = block.timestamp -
+            auction.amDuFiReToStaStpEnExEr[5];
+
+        if (secondsPassed >= auction.amDuFiReToStaStpEnExEr[1]) {
+            return auction.amDuFiReToStaStpEnExEr[7];
+        } else {
+            uint256 currentPrice = auction.amDuFiReToStaStpEnExEr[6].sub(
+                (block.timestamp.sub(auction.amDuFiReToStaStpEnExEr[5])).mul(
+                    (
+                        auction.amDuFiReToStaStpEnExEr[6].sub(
+                            auction.amDuFiReToStaStpEnExEr[7]
+                        )
+                    ).div(auction.amDuFiReToStaStpEnExEr[1])
+                )
+            );
+            if (currentPrice < auction.amDuFiReToStaStpEnExEr[7]) {
+                currentPrice = auction.amDuFiReToStaStpEnExEr[7];
+            }
+            return currentPrice;
+        }
+    }
+}
