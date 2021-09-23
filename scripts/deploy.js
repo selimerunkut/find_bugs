@@ -1,14 +1,9 @@
 require("@nomiclabs/hardhat-web3");
 const { HardhatRuntimeEnvironment } = require('hardhat/types');
-const { generatedWallets } = require('../test/generatedWallets');
-const { JsonRpcProvider } = require('@ethersproject/providers');
-const provider = new JsonRpcProvider("http://localhost:8545");
-const accounts = generatedWallets(provider);
-
 
 async function main() {
-  
-  //const ExchangeV2 = await ethers.getContractFactory('contracts/ExchangeV2.sol_flat.sol:ExchangeV2');
+  const accounts = await ethers.getSigners()
+
   const LibExchangeAuctionFactory = await ethers.getContractFactory("LibExchangeAuction");
   const libExchangeAuction = await LibExchangeAuctionFactory.deploy();
   const ExchangeV2 = await ethers.getContractFactory("ExchangeV2", {
@@ -31,16 +26,18 @@ async function main() {
   const erc20TransferProxy = erc20TransferProxyDeployed.address
 
   const exchangeFeeWallet = accounts[0].address
-  const adminRecoveryAddress = accounts[3].address
+  const adminRecoveryAddress = accounts[0].address
+  const feesBP = 200
 
   const instance = await upgrades.deployProxy(
     ExchangeV2,
-    [transferProxy, erc20TransferProxy, 100, exchangeFeeWallet, adminRecoveryAddress],
+    [transferProxy, erc20TransferProxy, feesBP, exchangeFeeWallet, adminRecoveryAddress],
     { initializer: '__ExchangeV2_init', unsafeAllowLinkedLibraries: true }
   );
+
   //add ExchangeV2 address to the the allowed operators of transferProxy & erc20TransferProxy
-  transferProxyDeployed.addOperator(instance.address)
-  erc20TransferProxyDeployed.addOperator(instance.address)
+  await transferProxyDeployed.addOperator(instance.address)
+  await erc20TransferProxyDeployed.addOperator(instance.address)
 
   console.log('ExchangeV2 Deployed', instance.address);
   console.log('transferProxy: ', transferProxy)
@@ -48,7 +45,7 @@ async function main() {
   console.log('exchangeFeeWallet: ', exchangeFeeWallet)
   console.log('adminRecoveryAddress: ', adminRecoveryAddress)
   console.log('libExchangeAuction deployed: ', libExchangeAuction.address);
-  console.log('fee: ', 100)
+  console.log('fees value: ', feesBP / 100 + '%')
 }
 
 main()
