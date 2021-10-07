@@ -2,9 +2,9 @@ const ethUtil = require('ethereumjs-util');
 
 function id(str) {
 	const hex = `0x${ethUtil.keccak256(str).toString("hex").substring(0, 8)}`
-	console.log("id: "+ str + ": ",hex)
+	console.log("id: " + str + ": ", hex)
 	return hex;
-	
+
 }
 
 function enc(token, tokenId) {
@@ -21,13 +21,13 @@ const ERC20 = id("ERC20");
 const ERC721 = id("ERC721");
 const ERC1155 = id("ERC1155");
 /** 
- * see contracts/LibOrderData.sol
+ * see src/LibOrderData.sol
  * Order data can be set either empty = 0xffffffff
  * or ORDER_DATA_V1
  * if its set to ORDER_DATA_V1
  * it can handle payouts and origin fees
- * see also contracts/LibOrderDataV1.sol
- */ 
+ * see also src/LibOrderDataV1.sol
+ */
 const ORDER_DATA_V1 = id("V1");
 
 /**  
@@ -36,7 +36,7 @@ const ORDER_DATA_V1 = id("V1");
  */
 const NFT_TRANSFER_FROM_CONTRACT = id("NFT_TRANSFER_FROM_CONTRACT");
 
-//for transferDirection and transferType see contracts/SimpleTransferManager.sol
+//for transferDirection and transferType see src/SimpleTransferManager.sol
 // used as a variable for emitting event, transferDirection
 const TO_MAKER = id("TO_MAKER");
 // used as varibale for emitting event, transferDirection
